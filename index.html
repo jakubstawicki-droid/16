@@ -304,6 +304,61 @@
 
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
+  /* ---------- Screens ---------- */
+  .screen[hidden] { display: none; }
+  .screen.enter { animation: screenIn .5s var(--ease-out) both; }
+  .screen.leave { animation: screenOut .22s ease-in both; }
+  .screen.back.enter { --dir: -1; }
+  .screen.back.leave { --dir: -1; }
+  @keyframes screenIn {
+    from { opacity: 0; transform: translateX(calc(var(--dir, 1) * 32px)); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes screenOut {
+    from { opacity: 1; transform: none; }
+    to { opacity: 0; transform: translateX(calc(var(--dir, 1) * -32px)); }
+  }
+
+  /* ---------- Rules screen: big type, readable in dim light ---------- */
+  .rules { font-size: clamp(19px, 2.4vw, 22px); line-height: 1.5; }
+  .rules-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; }
+  .rules-top h2 { margin: 0; font-family: "Didot", "Bodoni 72", Georgia, serif; font-weight: 400; font-size: clamp(30px, 6vw, 40px); color: var(--gold-soft); }
+  .rules section.card h2 { font-size: clamp(26px, 5vw, 32px); }
+  .rules .pairs { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+  .rules .pair { font-size: 1em; padding: 14px 16px; }
+  .rules .pair .num { width: 38px; height: 38px; font-size: 17px; }
+  .rules .pair .extra { font-size: .8em; }
+  .rules .queue-note, .rules .free-note { margin: 14px 0 0; color: var(--muted); font-size: .85em; }
+  .rules .free-note strong { color: var(--gold-soft); }
+
+  .howto { display: grid; grid-template-columns: 170px 1fr; gap: clamp(18px, 4vw, 36px); align-items: start; }
+  .table-svg { width: 100%; height: auto; display: block; position: sticky; top: 16px; }
+  .steps { list-style: none; margin: 0; padding: 0; counter-reset: step; display: grid; gap: 14px; }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 2px 0 14px 54px;
+    border-bottom: 1px solid var(--line);
+    color: var(--text);
+  }
+  .steps li:last-child { border-bottom: none; padding-bottom: 0; }
+  .steps li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: 0;
+    width: 38px; height: 38px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 17px; font-weight: 700; color: var(--black);
+    background: linear-gradient(160deg, var(--gold-soft), var(--gold-deep));
+  }
+  .steps strong, .faq strong { color: var(--gold-soft); }
+
+  details.faq > summary { font-size: clamp(22px, 4.4vw, 28px); line-height: 1.25; gap: 16px; }
+  .faq ul { margin: 0; padding: 0 20px 20px; list-style: none; display: grid; gap: 14px; }
+  .faq li { position: relative; padding-left: 28px; }
+  .faq li::before { content: ""; position: absolute; left: 4px; top: .62em; width: 10px; height: 10px; border-radius: 2px; transform: rotate(45deg); background: var(--gold); }
+
+  .rules-bottom { margin-top: 28px; display: flex; justify-content: center; }
+
   footer { margin-top: 40px; text-align: center; color: var(--muted); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; opacity: .7; }
 
   @media (max-width: 640px) {
@@ -312,6 +367,9 @@
     .settings-grid { grid-template-columns: 1fr; }
     .btn-primary { width: 100%; }
     .controls .btn:not(.btn-primary) { width: 100%; }
+    .howto { grid-template-columns: 1fr; }
+    .table-svg { position: static; max-width: 190px; margin: 0 auto; }
+    .rules .pairs { grid-template-columns: 1fr; }
   }
 
   /* Reduced motion: shorten, don't remove */
@@ -325,6 +383,10 @@
     .shots .liquid, .shots .glint { animation-duration: 8s; }
     .shots .ball-x, .shots .ball-y, .shots .ball-fade, .shots .splash { animation-duration: 5s; }
     details.card > summary::after, .wheel .rot { transition-duration: .1s; }
+    .screen.enter { animation-duration: .2s; }
+    .screen.leave { animation-duration: .1s; }
+    @keyframes screenIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes screenOut { from { opacity: 1; } to { opacity: 0; } }
   }
 </style>
 </head>
@@ -373,6 +435,7 @@
   </header>
 
   <main>
+  <div class="screen" id="screenDraw">
     <div class="stage">
       <div class="wheel-box">
         <div class="wheel-label">Chłopacy <span class="count" id="countB"></span></div>
@@ -386,6 +449,7 @@
 
     <div class="controls">
       <button class="btn btn-primary" id="drawBtn" type="button">LOSUJ PARĘ</button>
+      <button class="btn btn-primary" id="nextBtn" type="button" hidden>DALEJ — ZASADY</button>
       <button class="btn" id="resetBtn" type="button">RESET</button>
     </div>
     <p class="status" id="status" aria-live="polite"></p>
@@ -430,6 +494,79 @@
         </div>
       </div>
     </details>
+  </div>
+
+  <div class="screen rules" id="screenRules" hidden>
+    <div class="rules-top">
+      <h2 id="rulesTitle" tabindex="-1">Zasady gry</h2>
+      <button class="btn" id="backBtn" type="button">WSTECZ</button>
+    </div>
+
+    <section class="card" aria-labelledby="rulesPairsTitle">
+      <h2 id="rulesPairsTitle">Pary</h2>
+      <ol class="pairs" id="rulesPairs"></ol>
+      <p class="free-note" id="rulesFree" hidden></p>
+      <p class="queue-note">Kolejność gry według numerów.</p>
+    </section>
+
+    <section class="card" aria-labelledby="howTitle">
+      <h2 id="howTitle">Jak gramy</h2>
+      <div class="howto">
+        <svg class="table-svg" viewBox="0 0 170 360" role="img" aria-labelledby="tableSvgTitle">
+          <title id="tableSvgTitle">Stół z góry: dwa trójkąty kubków czubkami do środka, para naprzeciw pary, strzałka rzutu na stronę rywali</title>
+          <defs>
+            <marker id="arrowHead" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 Z" fill="#f1d58a"/>
+            </marker>
+          </defs>
+          <rect x="22" y="40" width="126" height="280" rx="10" fill="#24103a" stroke="#d4a944" stroke-width="2"/>
+          <line x1="22" y1="180" x2="148" y2="180" stroke="#4a2170" stroke-width="1.5" stroke-dasharray="4 5"/>
+          <!-- rywale: 3-2-1, tip towards centre -->
+          <g fill="#050407" stroke="#d4a944" stroke-width="2">
+            <circle cx="63" cy="60" r="10"/><circle cx="85" cy="60" r="10"/><circle cx="107" cy="60" r="10"/>
+            <circle cx="74" cy="79" r="10"/><circle cx="96" cy="79" r="10"/>
+            <circle cx="85" cy="98" r="10"/>
+          </g>
+          <!-- wy: 3-2-1, tip towards centre -->
+          <g fill="#050407" stroke="#7b3fb3" stroke-width="2">
+            <circle cx="63" cy="300" r="10"/><circle cx="85" cy="300" r="10"/><circle cx="107" cy="300" r="10"/>
+            <circle cx="74" cy="281" r="10"/><circle cx="96" cy="281" r="10"/>
+            <circle cx="85" cy="262" r="10"/>
+          </g>
+          <!-- players -->
+          <g fill="#d4a944"><circle cx="65" cy="20" r="9"/><circle cx="105" cy="20" r="9"/></g>
+          <g fill="#7b3fb3"><circle cx="65" cy="340" r="9"/><circle cx="105" cy="340" r="9"/></g>
+          <!-- throw -->
+          <path d="M112 330 Q 150 200 92 106" fill="none" stroke="#f1d58a" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 7" marker-end="url(#arrowHead)"/>
+          <text x="12" y="24" font-size="13" fill="#d4a944" font-family="system-ui, sans-serif" letter-spacing=".08em" transform="rotate(-90 12 24)" text-anchor="end">RYWALE</text>
+          <text x="12" y="336" font-size="13" fill="#b98ae6" font-family="system-ui, sans-serif" letter-spacing=".08em" transform="rotate(-90 12 336)" text-anchor="start">WY</text>
+        </svg>
+        <ol class="steps">
+          <li>Grasz <strong>w parze</strong>. Twoja para jest wylosowana — nie zmieniamy.</li>
+          <li>Stajecie na <strong>przeciwnych końcach stołu</strong>, para naprzeciw pary.</li>
+          <li>Na turę rzucacie <strong>dwie piłeczki</strong> — każdy po jednej.</li>
+          <li><strong>Trafienie?</strong> Ktoś z trafionej pary wypija zawartość kubka, a kubek schodzi ze stołu.</li>
+          <li><strong>Oba trafienia w turze?</strong> Piłeczki wracają, rzucacie jeszcze raz.</li>
+          <li>Potem tura przechodzi <strong>na drugą stronę</strong>.</li>
+          <li>Wygrywa para, która <strong>pierwsza zbije wszystkie kubki</strong> rywali.</li>
+          <li>Przegrana para schodzi, wchodzi <strong>kolejna z listy</strong>.</li>
+        </ol>
+      </div>
+    </section>
+
+    <details class="card faq">
+      <summary>Zasady, o które zawsze ktoś pyta</summary>
+      <ul>
+        <li><strong>Łokieć za krawędzią stołu</strong> — nie pochylasz się nad stołem.</li>
+        <li>Piłeczka może <strong>odbić się od stołu</strong>, ale wtedy przeciwnik może ją odbić ręką.</li>
+        <li>Przy <strong>6, 3 i 1</strong> pozostałym kubku możesz poprosić o przegrupowanie w zwarty kształt.</li>
+      </ul>
+    </details>
+
+    <div class="rules-bottom">
+      <button class="btn" id="backBtn2" type="button">WSTECZ — DO LOSOWANIA</button>
+    </div>
+  </div>
   </main>
 
   <footer>Sto lat!</footer>
@@ -661,7 +798,7 @@
   var wheelG = new Wheel(document.getElementById('wheelG'), null); // gradient #goldGrad is shared document-wide
   // ---------- Rendering UI ----------
   var $ = function (id) { return document.getElementById(id); };
-  var drawBtn = $('drawBtn'), resetBtn = $('resetBtn'), statusEl = $('status');
+  var drawBtn = $('drawBtn'), resetBtn = $('resetBtn'), nextBtn = $('nextBtn'), statusEl = $('status');
 
   function h(tag, props, children) {
     var n = document.createElement(tag);
@@ -686,21 +823,23 @@
     var ol = $('pairs');
     ol.innerHTML = '';
     $('pairsEmpty').hidden = round.pairs.length > 0;
-    round.pairs.forEach(function (pair, i) {
-      var main = pair.members.slice(0, 2), extra = pair.members.slice(2);
-      var names = h('div', { class: 'names' }, [
-        h('strong', { text: nameOf(main[0]) }),
-        h('span', { class: 'amp', text: '&' }),
-        h('strong', { text: nameOf(main[1]) }),
-        pair.locked ? h('span', { class: 'tag', text: 'zablokowana' }) : null,
-        extra.length ? h('span', { class: 'extra', text: '+ ' + extra.map(nameOf).join(', ') }) : null
-      ]);
-      ol.appendChild(h('li', { class: 'pair' + (i === lastAdded ? ' enter' : '') }, [
-        h('span', { class: 'num', text: String(i + 1) }), names
-      ]));
-    });
+    round.pairs.forEach(function (pair, i) { ol.appendChild(pairItem(pair, i, i === lastAdded)); });
     lastAdded = -1;
     renderFree();
+  }
+
+  function pairItem(pair, i, animate) {
+    var main = pair.members.slice(0, 2), extra = pair.members.slice(2);
+    var names = h('div', { class: 'names' }, [
+      h('strong', { text: nameOf(main[0]) }),
+      h('span', { class: 'amp', text: '&' }),
+      h('strong', { text: nameOf(main[1]) }),
+      pair.locked ? h('span', { class: 'tag', text: 'zablokowana' }) : null,
+      extra.length ? h('span', { class: 'extra', text: '+ ' + extra.map(nameOf).join(', ') }) : null
+    ]);
+    return h('li', { class: 'pair' + (animate ? ' enter' : '') }, [
+      h('span', { class: 'num', text: String(i + 1) }), names
+    ]);
   }
 
   function renderFree() {
@@ -735,8 +874,12 @@
     animateFree = false;
   }
 
+  function drawFinished() { return !spinning && !canDraw() && round.pairs.length > 0; }
+
   function renderControls() {
     drawBtn.disabled = spinning || !canDraw();
+    nextBtn.hidden = !drawFinished();
+    drawBtn.hidden = !nextBtn.hidden;
     resetBtn.disabled = spinning;
     document.querySelectorAll('#settings input, #settings select, #settings button').forEach(function (n) { n.disabled = spinning; });
     if (!spinning) {
@@ -875,6 +1018,66 @@
     renderAll();
   });
 
+  // ---------- Screens ----------
+  // #zasady in the URL drives the screen, so the phone's back gesture works too.
+  var screens = { draw: $('screenDraw'), rules: $('screenRules') };
+  var current = 'draw';
+  var pushedRules = false;
+
+  function renderRules() {
+    var ol = $('rulesPairs');
+    ol.innerHTML = '';
+    round.pairs.forEach(function (pair, i) { ol.appendChild(pairItem(pair, i, false)); });
+    var free = freeAgents();
+    var note = $('rulesFree');
+    note.hidden = !free.length;
+    note.innerHTML = '';
+    if (free.length) {
+      note.appendChild(document.createTextNode(free.length > 1 ? 'Wolni strzelcy: ' : 'Wolny strzelec: '));
+      note.appendChild(h('strong', { text: free.map(nameOf).join(', ') }));
+      note.appendChild(document.createTextNode(' — dołącz do dowolnej pary.'));
+    }
+  }
+
+  function showScreen(name) {
+    if (name === 'rules' && !drawFinished()) name = 'draw';
+    if (name === current) return;
+    var from = screens[current], to = screens[name];
+    var back = name === 'draw';
+    if (name === 'rules') renderRules();
+    current = name;
+    [from, to].forEach(function (s) { s.classList.remove('enter', 'leave', 'back'); s.classList.toggle('back', back); });
+    from.classList.add('leave');
+    setTimeout(function () {
+      from.hidden = true;
+      from.classList.remove('leave', 'back');
+      to.hidden = false;
+      to.classList.add('enter');
+      window.scrollTo(0, 0);
+      if (name === 'rules') $('rulesTitle').focus({ preventScroll: true });
+      else nextBtn.focus({ preventScroll: true });
+    }, reducedMotion ? 100 : 220);
+  }
+
+  function screenFromHash() { return location.hash === '#zasady' ? 'rules' : 'draw'; }
+
+  window.addEventListener('hashchange', function () {
+    if (screenFromHash() === 'draw') pushedRules = false;
+    showScreen(screenFromHash());
+  });
+
+  nextBtn.addEventListener('click', function () {
+    pushedRules = true;
+    location.hash = 'zasady';
+  });
+
+  function goBack() {
+    if (pushedRules) history.back();
+    else location.hash = '';
+  }
+  $('backBtn').addEventListener('click', goBack);
+  $('backBtn2').addEventListener('click', goBack);
+
   // ---------- Confetti ----------
   var canvas = $('confetti');
   var ctx = canvas.getContext('2d');
@@ -951,6 +1154,10 @@
   animateFree = false;
   renderSettings();
   renderAll();
+  // results live in memory only, so a reload always starts on the draw screen
+  if (location.hash === '#zasady') {
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { location.hash = ''; }
+  }
 })();
 </script>
 </body>
